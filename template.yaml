@@ -33,6 +33,7 @@ Resources:
   AlcCacheSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
+      GroupName: 'AlcMemcachedSecurityGroup'
       GroupDescription: Allow access to Elasticache cluster
       VpcId: !Ref AlcVPC
       SecurityGroupIngress:
@@ -40,10 +41,14 @@ Resources:
           FromPort: 11211
           ToPort: 11211
           CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: 'AlcMemcachedSecurityGroup'
 
   AlcElasticacheCluster:
     Type: 'AWS::ElastiCache::CacheCluster'
     Properties:
+      ClusterName: 'AlcMemcachedCluster'
       CacheNodeType: cache.t2.micro
       CacheSubnetGroupName: !Ref AlcElasticacheSubnetGroup
       Engine: memcached
