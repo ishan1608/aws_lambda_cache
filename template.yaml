@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  AlcVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      Tags:
+        - Key: Name
+          Value: AlcVPC
+
+  AlcSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: '10.0.1.0/24'
+      VpcId: !Ref AlcVPC
+      AvailabilityZone: !Select ['0', !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: AlcPublicSubnet1
+
+  AlcSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      CidrBlock: '10.0.2.0/24'
+      VpcId: !Ref AlcVPC
+      AvailabilityZone: !Select ['1', !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: AlcPublicSubnet2
+
+  AlcCacheSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allow access to Elasticache cluster
+      VpcId: !Ref AlcVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 11211
+          ToPort: 11211
+          CidrIp: 0.0.0.0/0
+
+  AlcElasticacheCluster:
+    Type: 'AWS::ElastiCache::CacheCluster'
+    Properties:
+      CacheNodeType: cache.t2.micro
+      CacheSubnetGroupName: !Ref AlcElasticacheSubnetGroup
+      Engine: memcached
+      NumCacheNodes: 1
+      VpcSecurityGroupIds:
+        - !GetAtt AlcCacheSecurityGroup.GroupId
+
+  AlcElasticacheSubnetGroup:
+    Type: 'AWS::ElastiCache::SubnetGroup'
+    Properties:
+      CacheSubnetGroupName: AlcElasticacheSubnetGroup
+      Description: Subnet group for Elasticache
+      SubnetIds:
+        - !Ref AlcSubnet1
+        - !Ref AlcSubnet2
+
+  AlcMainLambdaFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      FunctionName: !Sub alc_main_function
+      Handler: functions.common.app.lambda_handler
+      Runtime: python3.8
+      CodeUri: .
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt AlcCacheSecurityGroup.GroupId
+        SubnetIds:
+          - !Ref AlcSubnet1
+          - !Ref AlcSubnet2
+      Environment:
+        Variables:
+          CACHE_ENDPOINT: !GetAtt AlcElasticacheCluster.ConfigurationEndpoint.Address
+          MODULE_PATH: ''
+      Events:
+        RootApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MainApi
+            Path: /
+            Method: ANY
+        RootProxyApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MainApi
+            Path: /{proxy+}
+            Method: ANY
+
+  # API
+  MainApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Description: 'Alc Main API'
+      StageName: alc_main_api
+      Cors:
+        AllowMethods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+        AllowHeaders: "'X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Requested-With,X-Auth-Token,Referer,User-Agent,Origin,Content-Type,Authorization,Accept,Access-Control-Allow-Methods,Access-Control-Allow-Origin,Access-Control-Allow-Headers,X-token-pm,X-token-ehr,X-request-sleep-time'"
+        AllowOrigin: "'*'"
+        MaxAge: "'600'"
+        AllowCredentials: false
+      GatewayResponses: # https://github.com/aws/serverless-application-model/blob/master/versions/2016-10-31.md#gateway-response-object
+        INTEGRATION_TIMEOUT:
+          StatusCode: '504' # Even though this is the default value for INTEGRATION_TIMEOUT.
+          ResponseTemplates:
+            "application/json": '{ "message": $context.error.messageString }'
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Methods: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+              Access-Control-Allow-Origin: "'*'"
+        UNAUTHORIZED:
+          StatusCode: '401' # Even though this is the default value for UNAUTHORIZED.
+          ResponseTemplates:
+            "application/json": '{ "message": $context.error.messageString }'
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Methods: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+              Access-Control-Allow-Origin: "'*'"
+
+Outputs:
+  MainApi:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${MainApi}.execute-api.${AWS::Region}.amazonaws.com/alc_main_api"
