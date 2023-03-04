@@ -45,6 +45,15 @@ Resources:
         - Key: Name
           Value: 'AlcMemcachedSecurityGroup'
 
+  AlcElasticacheSubnetGroup:
+    Type: 'AWS::ElastiCache::SubnetGroup'
+    Properties:
+      CacheSubnetGroupName: AlcElasticacheSubnetGroup
+      Description: Subnet group for Elasticache
+      SubnetIds:
+        - !Ref AlcSubnet1
+        - !Ref AlcSubnet2
+
   AlcElasticacheCluster:
     Type: 'AWS::ElastiCache::CacheCluster'
     Properties:
@@ -55,15 +64,6 @@ Resources:
       NumCacheNodes: 1
       VpcSecurityGroupIds:
         - !GetAtt AlcCacheSecurityGroup.GroupId
-
-  AlcElasticacheSubnetGroup:
-    Type: 'AWS::ElastiCache::SubnetGroup'
-    Properties:
-      CacheSubnetGroupName: AlcElasticacheSubnetGroup
-      Description: Subnet group for Elasticache
-      SubnetIds:
-        - !Ref AlcSubnet1
-        - !Ref AlcSubnet2
 
   AlcMainLambdaFunction:
     Type: 'AWS::Serverless::Function'
