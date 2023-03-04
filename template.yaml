@@ -30,6 +30,15 @@ Resources:
         - Key: Name
           Value: AlcPublicSubnet2
 
+  AlcElasticacheSubnetGroup:
+    Type: 'AWS::ElastiCache::SubnetGroup'
+    Properties:
+      CacheSubnetGroupName: AlcElasticacheSubnetGroup
+      Description: Subnet group for Elasticache
+      SubnetIds:
+        - !Ref AlcSubnet1
+        - !Ref AlcSubnet2
+
   AlcCacheSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -44,15 +53,6 @@ Resources:
       Tags:
         - Key: Name
           Value: 'AlcMemcachedSecurityGroup'
-
-  AlcElasticacheSubnetGroup:
-    Type: 'AWS::ElastiCache::SubnetGroup'
-    Properties:
-      CacheSubnetGroupName: AlcElasticacheSubnetGroup
-      Description: Subnet group for Elasticache
-      SubnetIds:
-        - !Ref AlcSubnet1
-        - !Ref AlcSubnet2
 
   AlcElasticacheCluster:
     Type: 'AWS::ElastiCache::CacheCluster'
